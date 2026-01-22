@@ -25,6 +25,7 @@ from processors.ner_seq import ner_processors as processors
 from processors.ner_seq import collate_fn
 from metrics.ner_metrics import SeqEntityScore
 from tools.finetuning_argparse import get_argparse
+import random
 
 MODEL_CLASSES = {
     ## bert ernie bert_wwm bert_wwwm_ext
@@ -234,78 +235,114 @@ def train(args, train_dataset, model, tokenizer):
 
 
 def evaluate(args, model, tokenizer, prefix=""):
-    metric = SeqEntityScore(args.id2label,markup=args.markup)
+    metric = SeqEntityScore(args.id2label, markup=args.markup)
     eval_output_dir = args.output_dir
     if not os.path.exists(eval_output_dir) and args.local_rank in [-1, 0]:
         os.makedirs(eval_output_dir)
-    eval_dataset = load_and_cache_examples(args, args.task_name,tokenizer, data_type='dev')
+
+    eval_dataset = load_and_cache_examples(args, args.task_name, tokenizer, data_type='dev')
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
-    # Note that DistributedSampler samples randomly
+
     eval_sampler = SequentialSampler(eval_dataset) if args.local_rank == -1 else DistributedSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size,
-                                 collate_fn=collate_fn)
-    # Eval!
+    eval_dataloader = DataLoader(
+        eval_dataset,
+        sampler=eval_sampler,
+        batch_size=args.eval_batch_size,
+        collate_fn=collate_fn
+    )
+
     logger.info("***** Running evaluation %s *****", prefix)
     logger.info("  Num examples = %d", len(eval_dataset))
     logger.info("  Batch size = %d", args.eval_batch_size)
+
     eval_loss = 0.0
     nb_eval_steps = 0
     pbar = ProgressBar(n_total=len(eval_dataloader), desc="Evaluating")
+
+    loss_fct = CrossEntropyLoss(ignore_index=-100)
+    printed = False
+
     for step, batch in enumerate(eval_dataloader):
         model.eval()
         batch = tuple(t.to(args.device) for t in batch)
+
         with torch.no_grad():
             inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
             if args.model_type != "distilbert":
                 inputs["token_type_ids"] = (batch[2] if args.model_type in ["bert", "xlnet"] else None)
 
             outputs = model(**inputs)
-            logits = outputs[0]
+            logits = outputs[0]  # [B, L, C]
 
-            labels = batch[3]
-            loss_fct = CrossEntropyLoss(ignore_index=-100)
+            labels = batch[3]    # [B, L]  (含 -100)
             tmp_eval_loss = loss_fct(logits.view(-1, logits.size(-1)), labels.view(-1))
 
-        #     inputs = {"i nput_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
-        #     if args.model_type != "distilbert":
-        #         # XLM and RoBERTa don"t use segment_ids
-        #         inputs["token_type_ids"] = (batch[2] if args.model_type in ["bert", "xlnet"] else None)
-        #     outputs = model(**inputs)
-        # tmp_eval_loss, logits = outputs[:2]
         if args.n_gpu > 1:
-            tmp_eval_loss = tmp_eval_loss.mean()  # mean() to average on multi-gpu parallel evaluating
+            tmp_eval_loss = tmp_eval_loss.mean()
+
         eval_loss += tmp_eval_loss.item()
         nb_eval_steps += 1
-        preds = np.argmax(logits.cpu().numpy(), axis=2).tolist()
-        out_label_ids = inputs['labels'].cpu().numpy().tolist()
-        input_lens = batch[4].cpu().numpy().tolist()
-        for i, label in enumerate(out_label_ids):
-            temp_1 = []
-            temp_2 = []
-            for j, m in enumerate(label):
-                if j == 0:
-                    continue
-                elif j == input_lens[i]-1:
-                    metric.update(pred_paths=[temp_2], label_paths=[temp_1])
+
+        pred_ids = logits.argmax(dim=-1).detach().cpu().tolist()   # [B, L]
+        gold_ids = labels.detach().cpu().tolist()                  # [B, L]
+        input_lens = batch[4].detach().cpu().tolist()              # [B]
+
+        # 逐样本构造一条 label 序列：去掉 CLS(0) 和 SEP(len-1)，并跳过 -100
+        for i in range(len(gold_ids)):
+            L = input_lens[i]  # 实际长度（通常包含 CLS/SEP）
+
+            gold_path = []
+            pred_path = []
+
+            # token 下标范围：1..L-2（排除 CLS=0 与 SEP=L-1）
+            for j in range(1, max(1, L - 1)):
+                if j == L - 1:
                     break
-                else:
-                    temp_1.append(args.id2label[out_label_ids[i][j]])
-                    temp_2.append(preds[i][j])
+
+                g = gold_ids[i][j]
+                if g == -100:
+                    # 被 mask 的 token（subword / padding）直接跳过，不参与评估
+                    continue
+
+                gold_path.append(args.id2label[g])
+
+                p = pred_ids[i][j]
+                pred_path.append(args.id2label[p])
+
+                # ✅ 新增：随机打印一条样本（只打印一次）
+                if (not printed) and (args.local_rank in [-1, 0]):
+                    if random.random() < 0.02 or step == 0:  # 保险：第一步必打印
+                        printed = True
+                        logger.info("----- DEBUG ONE SAMPLE -----")
+                        logger.info(f"input_len={L}, gold_len={len(gold_path)}, pred_len={len(pred_path)}")
+                        logger.info("GOLD[:80] = " + " ".join(gold_path[:80]))
+                        logger.info("PRED[:80] = " + " ".join(pred_path[:80]))
+                        logger.info("----------------------------")
+
+            # 注意 SeqEntityScore.update 要求 list-of-paths
+            metric.update(pred_paths=[pred_path], label_paths=[gold_path])
+
         pbar(step)
+
     logger.info("\n")
-    eval_loss = eval_loss / nb_eval_steps
+    eval_loss = eval_loss / max(nb_eval_steps, 1)
+
     eval_info, entity_info = metric.result()
     results = {f'{key}': value for key, value in eval_info.items()}
     results['loss'] = eval_loss
+
     logger.info("***** Eval results %s *****", prefix)
     info = "-".join([f' {key}: {value:.4f} ' for key, value in results.items()])
     logger.info(info)
+
     logger.info("***** Entity results %s *****", prefix)
     for key in sorted(entity_info.keys()):
-        logger.info("******* %s results ********"%key)
-        info = "-".join([f' {key}: {value:.4f} ' for key, value in entity_info[key].items()])
+        logger.info("******* %s results ********" % key)
+        info = "-".join([f' {k}: {v:.4f} ' for k, v in entity_info[key].items()])
         logger.info(info)
+
     return results
+
 
 def predict(args, model, tokenizer, prefix=""):
     pred_output_dir = args.output_dir
