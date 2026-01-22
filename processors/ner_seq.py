@@ -168,12 +168,9 @@ def convert_examples_to_features(
     pad_token_segment_id=0,
     sequence_a_segment_id=0,
     mask_padding_with_zero=True,
-    pad_token_label_id=-100,
-    label_all_subtokens=False,
-    **kwargs,  # ✅ 吞掉旧版多余参数，兼容 run_ner_softmax.py 的调用
+    pad_token_label_id=-100,   # ✅ 关键：padding label 忽略
+    label_all_subtokens=False, # ✅ False: 只给首subtoken打label；True: 给所有subtoken扩展label
 ):
-    ...
-
     label_map = {label: i for i, label in enumerate(label_list)}
     features = []
 
