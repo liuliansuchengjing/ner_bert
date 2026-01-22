@@ -277,5 +277,5 @@ class MyNerProcessor(DataProcessor):
 ner_processors = {
     "cner": CnerProcessor,
     'cluener':CluenerProcessor,
-    'my_ner':MyNerProcessor
+    'myner':MyNerProcessor
 }

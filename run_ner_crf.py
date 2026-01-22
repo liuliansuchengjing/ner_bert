@@ -14,7 +14,7 @@ from callback.progressbar import ProgressBar
 from tools.common import seed_everything,json_to_text
 from tools.common import init_logger, logger
 
-from transformers import WEIGHTS_NAME, BertConfig,get_linear_schedule_with_warmup,AdamW, BertTokenizer
+from transformers import WEIGHTS_NAME, BertConfig,get_linear_schedule_with_warmup, BertTokenizer
 from models.bert_for_ner import BertCrfForNer
 from processors.utils_ner import get_entities
 from processors.ner_seq import convert_examples_to_features

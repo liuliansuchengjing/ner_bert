@@ -13,7 +13,7 @@ from callback.adversarial import FGM
 from tools.common import seed_everything, json_to_text
 from tools.common import init_logger, logger
 
-from transformers import WEIGHTS_NAME, BertConfig,get_linear_schedule_with_warmup,AdamW, BertTokenizer
+from transformers import WEIGHTS_NAME, BertConfig,get_linear_schedule_with_warmup, BertTokenizer
 from models.bert_for_ner import BertSpanForNer
 from processors.ner_span import convert_examples_to_features
 from processors.ner_span import ner_processors as processors
