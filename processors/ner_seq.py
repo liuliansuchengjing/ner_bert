@@ -241,15 +241,24 @@ class MyNerProcessor(DataProcessor):
 
     def get_train_examples(self, data_dir):
         """See base class."""
-        return self._create_examples(self._read_json(os.path.join(data_dir, "train.txt")), "train")
+        # return self._create_examples(self._read_json(os.path.join(data_dir, "train.json")), "train")
+        return self._create_examples(
+            self._read_text(os.path.join(data_dir, "train.txt")), "train"
+        )
 
     def get_dev_examples(self, data_dir):
         """See base class."""
-        return self._create_examples(self._read_json(os.path.join(data_dir, "dev.txt")), "dev")
+        # return self._create_examples(self._read_json(os.path.join(data_dir, "dev.json")), "dev")
+        return self._create_examples(
+            self._read_text(os.path.join(data_dir, "dev.txt")), "dev"
+        )
 
     def get_test_examples(self, data_dir):
         """See base class."""
-        return self._create_examples(self._read_json(os.path.join(data_dir, "test.txt")), "test")
+        # return self._create_examples(self._read_json(os.path.join(data_dir, "test.json")), "test")
+        return self._create_examples(
+            self._read_text(os.path.join(data_dir, "test.txt")), "test"
+        )
 
     def get_labels(self):
         return [
