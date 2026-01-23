@@ -198,7 +198,7 @@ class CnerProcessor(DataProcessor):
             examples.append(InputExample(guid=guid, text_a=text_a, labels=labels))
         return examples
 
-class MynerProcessor(DataProcessor):
+class GtnerProcessor(DataProcessor):
     """Processor for the chinese ner data set."""
 
     def get_train_examples(self, data_dir):
@@ -323,4 +323,5 @@ ner_processors = {
     "cner": CnerProcessor,
     'cluener':CluenerProcessor,
     'myner':MyNerProcessor,
+    'gtner':GtnerProcessor
 }
