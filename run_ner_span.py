@@ -22,6 +22,8 @@ from metrics.ner_metrics import SpanEntityScore
 from processors.utils_ner import bert_extract_item
 from tools.finetuning_argparse import get_argparse
 
+from callback.optimizater.adamw import AdamW
+
 MODEL_CLASSES = {
     ## bert ernie bert_wwm bert_wwwm_ext
     'bert': (BertConfig, BertSpanForNer, BertTokenizer),
