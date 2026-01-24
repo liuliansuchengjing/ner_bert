@@ -232,7 +232,7 @@ class GtProcessor(DataProcessor):
 
     def get_labels(self):
         """See base class."""
-        return ["O", "ACTION", "CAUSE","CAUSE","DEPT",'DEVICE','EXP_RESULT','MAINT_COND','MAINT_EXP','MON_DATA','PREVENT','RISK','SIG_MODEL','SYMPTOM','TEST']
+        return ["O", "ACTION", "CAUSE","DEPT",'DEVICE','EXP_RESULT','MAINT_COND','MAINT_EXP','MON_DATA','PREVENT','RISK','SIG_MODEL','SYMPTOM','TEST']
 
     def _create_examples(self, lines, set_type):
         """Creates examples for the training and dev sets."""
@@ -250,7 +250,7 @@ class GtProcessor(DataProcessor):
                     labels.append(x.replace('E-', 'I-'))
                 else:
                     labels.append(x)
-            subject = get_entities(labels,id2label=None,markup='bios')
+            subject = get_entities(labels,id2label=None,markup='bio')
             examples.append(InputExample(guid=guid, text_a=text_a, subject=subject))
         return examples
 
