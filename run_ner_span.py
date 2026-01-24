@@ -235,13 +235,32 @@ def evaluate(args, model, tokenizer, prefix=""):
     results = {f'{key}': value for key, value in eval_info.items()}
     results['loss'] = eval_loss
     logger.info("***** Eval results %s *****", prefix)
-    info = "-".join([f' {key}: {value:.4f} ' for key, value in results.items()])
+    info = "-".join([f' {key}: {value:.4f} ' for key, value in results.items() if not isinstance(value, int)])
     logger.info(info)
+    
+    # 打印整体 TP, FP, FN
+    if 'tp' in eval_info and 'fp' in eval_info and 'fn' in eval_info:
+        logger.info("***** Overall TP, FP, FN *****")
+        logger.info(f"  Total True Positives (TP): {eval_info['tp']}")
+        logger.info(f"  Total False Positives (FP): {eval_info['fp']}")
+        logger.info(f"  Total False Negatives (FN): {eval_info['fn']}")
+        if 'tn' in eval_info:
+            logger.info(f"  Total True Negatives (TN): {eval_info['tn']}")
+
     logger.info("***** Entity results %s *****", prefix)
     for key in sorted(entity_info.keys()):
         logger.info("******* %s results ********" % key)
-        info = "-".join([f' {key}: {value:.4f} ' for key, value in entity_info[key].items()])
+        entity_result = entity_info[key]
+        info = "-".join([f' {k}: {v:.4f} ' for k, v in entity_result.items() if k not in ['tp', 'fp', 'fn', 'tn']])
         logger.info(info)
+        
+        # 打印每个类别的 TP, FP, FN
+        logger.info(f"  {key} - True Positives (TP): {entity_result['tp']}")
+        logger.info(f"  {key} - False Positives (FP): {entity_result['fp']}")
+        logger.info(f"  {key} - False Negatives (FN): {entity_result['fn']}")
+        if 'tn' in entity_result:
+            logger.info(f"  {key} - True Negatives (TN): {entity_result['tn']}")
+            
     return results
 
 

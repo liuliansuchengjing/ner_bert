@@ -25,16 +25,42 @@ class SeqEntityScore(object):
         found_counter = Counter([x[0] for x in self.founds])
         right_counter = Counter([x[0] for x in self.rights])
         for type_, count in origin_counter.items():
-            origin = count
-            found = found_counter.get(type_, 0)
-            right = right_counter.get(type_, 0)
+            origin = count  # TP + FN (实际为该类的总数)
+            found = found_counter.get(type_, 0)  # TP + FP (预测为该类的总数)
+            right = right_counter.get(type_, 0)  # TP (正确预测的数量)
             recall, precision, f1 = self.compute(origin, found, right)
-            class_info[type_] = {"acc": round(precision, 4), 'recall': round(recall, 4), 'f1': round(f1, 4)}
+            # 计算 TP, FP, FN
+            tp = right  # 真正例
+            fp = found - right  # 假正例
+            fn = origin - right  # 假负例
+            tn = len(self.origins) - origin - fp  # 真负例（对于特定类别）
+            class_info[type_] = {
+                "acc": round(precision, 4), 
+                'recall': round(recall, 4), 
+                'f1': round(f1, 4),
+                'tp': tp,
+                'fp': fp,
+                'fn': fn,
+                'tn': tn
+            }
         origin = len(self.origins)
         found = len(self.founds)
         right = len(self.rights)
         recall, precision, f1 = self.compute(origin, found, right)
-        return {'acc': precision, 'recall': recall, 'f1': f1}, class_info
+        # 计算整体 TP, FP, FN
+        overall_tp = right
+        overall_fp = found - right
+        overall_fn = origin - right
+        overall_tn = sum([item['tn'] for item in class_info.values()]) if class_info else 0
+        return {
+            'acc': precision, 
+            'recall': recall, 
+            'f1': f1,
+            'tp': overall_tp,
+            'fp': overall_fp,
+            'fn': overall_fn,
+            'tn': overall_tn
+        }, class_info
 
     def update(self, label_paths, pred_paths):
         '''
@@ -77,16 +103,42 @@ class SpanEntityScore(object):
         found_counter = Counter([self.id2label[x[0]] for x in self.founds])
         right_counter = Counter([self.id2label[x[0]] for x in self.rights])
         for type_, count in origin_counter.items():
-            origin = count
-            found = found_counter.get(type_, 0)
-            right = right_counter.get(type_, 0)
+            origin = count  # TP + FN (实际为该类的总数)
+            found = found_counter.get(type_, 0)  # TP + FP (预测为该类的总数)
+            right = right_counter.get(type_, 0)  # TP (正确预测的数量)
             recall, precision, f1 = self.compute(origin, found, right)
-            class_info[type_] = {"acc": round(precision, 4), 'recall': round(recall, 4), 'f1': round(f1, 4)}
+            # 计算 TP, FP, FN
+            tp = right  # 真正例
+            fp = found - right  # 假正例
+            fn = origin - right  # 假负例
+            tn = len(self.origins) - origin - fp  # 真负例（对于特定类别）
+            class_info[type_] = {
+                "acc": round(precision, 4), 
+                'recall': round(recall, 4), 
+                'f1': round(f1, 4),
+                'tp': tp,
+                'fp': fp,
+                'fn': fn,
+                'tn': tn
+            }
         origin = len(self.origins)
         found = len(self.founds)
         right = len(self.rights)
         recall, precision, f1 = self.compute(origin, found, right)
-        return {'acc': precision, 'recall': recall, 'f1': f1}, class_info
+        # 计算整体 TP, FP, FN
+        overall_tp = right
+        overall_fp = found - right
+        overall_fn = origin - right
+        overall_tn = sum([item['tn'] for item in class_info.values()]) if class_info else 0
+        return {
+            'acc': precision, 
+            'recall': recall, 
+            'f1': f1,
+            'tp': overall_tp,
+            'fp': overall_fp,
+            'fn': overall_fn,
+            'tn': overall_tn
+        }, class_info
 
     def update(self, true_subject, pred_subject):
         self.origins.extend(true_subject)
